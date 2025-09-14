@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phase 1 - PDF OCR Engine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+</head>
+<body class="bg-gray-900 text-white flex flex-col items-center justify-center min-h-screen p-4 font-sans">
+
+    <div class="w-full max-w-2xl text-center">
+        <h1 class="text-4xl font-bold mb-2">Phase 1: Core OCR Engine</h1>
+        <p class="text-gray-400 mb-6">Upload a PDF, get a searchable PDF back. Focus is on function, not form.</p>
+
+        <div class="bg-gray-800 p-8 rounded-lg border border-dashed border-gray-600">
+            <label for="pdf-upload" class="cursor-pointer bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 px-6 rounded-lg transition-colors">
+                Select PDF File
+            </label>
+            <input id="pdf-upload" type="file" class="hidden" accept="application/pdf">
+        </div>
+
+        <div id="status" class="mt-6 text-gray-300"></div>
+        <div id="result" class="mt-4"></div>
+    </div>
+
+    <script>
+        // Set the workerSrc for PDF.js. This is required.
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+
+        const fileInput = document.getElementById('pdf-upload');
+        const statusDiv = document.getElementById('status');
+        const resultDiv = document.getElementById('result');
+
+        fileInput.addEventListener('change', handleFileSelect, false);
+
+        async function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file || file.type !== 'application/pdf') {
+                statusDiv.textContent = 'Error: Please select a valid PDF file.';
+                return;
+            }
+
+            // Clear previous results and status
+            statusDiv.innerHTML = '';
+            resultDiv.innerHTML = '';
+
+            try {
+                // STEP 1: Render PDF pages to images using PDF.js
+                const pageImages = await renderPdfToImages(file);
+
+                // STEP 2: Perform OCR and create a searchable PDF using Tesseract.js
+                const searchablePdfBlob = await runOcr(pageImages);
+
+                // STEP 3: Display the download link
+                displayDownloadLink(searchablePdfBlob);
+
+            } catch (error) {
+                console.error('An error occurred:', error);
+                statusDiv.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        async function renderPdfToImages(file) {
+            const images = [];
+            const fileReader = new FileReader();
+
+            // Load the PDF document
+            statusDiv.textContent = 'Loading PDF...';
+            const pdf = await new Promise((resolve, reject) => {
+                fileReader.onload = async (event) => {
+                    const typedarray = new Uint8Array(event.target.result);
+                    try {
+                        const pdfDoc = await pdfjsLib.getDocument({ data: typedarray }).promise;
+                        resolve(pdfDoc);
+                    } catch (err) {
+                        reject(err);
+                    }
+                };
+                fileReader.readAsArrayBuffer(file);
+            });
+            
+            // Loop through each page and render it on a canvas
+            for (let i = 1; i <= pdf.numPages; i++) {
+                statusDiv.textContent = `Rendering page ${i}/${pdf.numPages}...`;
+                const page = await pdf.getPage(i);
+                const scale = 2.0; // Higher scale gives better OCR results
+                const viewport = page.getView
