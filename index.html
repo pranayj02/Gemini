@@ -1,89 +1,224 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Phase 1 - PDF OCR Engine</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
-</head>
-<body class="bg-gray-900 text-white flex flex-col items-center justify-center min-h-screen p-4 font-sans">
+import React, { useState, useEffect } from 'react';
+import { RefreshCcw, Info, Trophy, Activity, ArrowUp, ArrowDown } from 'lucide-react';
 
-    <div class="w-full max-w-2xl text-center">
-        <h1 class="text-4xl font-bold mb-2">Phase 1: Core OCR Engine</h1>
-        <p class="text-gray-400 mb-6">Upload a PDF, get a searchable PDF back. Focus is on function, not form.</p>
+const NRRCalculator = () => {
+  const [values, setValues] = useState({
+    runsScored: '',
+    oversFaced: '',
+    runsConceded: '',
+    oversBowled: ''
+  });
 
-        <div class="bg-gray-800 p-8 rounded-lg border border-dashed border-gray-600">
-            <label for="pdf-upload" class="cursor-pointer bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 px-6 rounded-lg transition-colors">
-                Select PDF File
-            </label>
-            <input id="pdf-upload" type="file" class="hidden" accept="application/pdf">
+  const [results, setResults] = useState({
+    nrr: null,
+    teamRunRate: null,
+    opponentRunRate: null,
+    error: null
+  });
+
+  // Helper to convert cricket overs (e.g., 10.4) to mathematical overs (e.g., 10.666)
+  const parseOversToDecimal = (oversStr) => {
+    if (!oversStr) return 0;
+    const val = parseFloat(oversStr);
+    if (isNaN(val)) return 0;
+
+    const overs = Math.floor(val);
+    // Get the decimal part and multiply by 10 to get balls. 
+    // e.g. 10.4 -> 0.4 -> 4 balls. 
+    // Math.round to handle floating point precision issues
+    let balls = Math.round((val - overs) * 10);
+    
+    // Safety check for weird inputs like 10.9 (cricket max is .5)
+    // If balls >= 6, we just treat it as balls, effectively increasing overs
+    return overs + (balls / 6);
+  };
+
+  const calculateNRR = () => {
+    const scored = parseFloat(values.runsScored);
+    const conceded = parseFloat(values.runsConceded);
+    const facedDecimal = parseOversToDecimal(values.oversFaced);
+    const bowledDecimal = parseOversToDecimal(values.oversBowled);
+
+    if (parseOversToDecimal(values.oversFaced) === 0 || parseOversToDecimal(values.oversBowled) === 0) {
+      setResults({ nrr: null, teamRunRate: null, opponentRunRate: null, error: null });
+      return;
+    }
+
+    if (!isNaN(scored) && !isNaN(conceded) && facedDecimal > 0 && bowledDecimal > 0) {
+      const teamRR = scored / facedDecimal;
+      const oppRR = conceded / bowledDecimal;
+      const netRR = teamRR - oppRR;
+
+      setResults({
+        nrr: netRR.toFixed(3),
+        teamRunRate: teamRR.toFixed(2),
+        opponentRunRate: oppRR.toFixed(2),
+        error: null
+      });
+    } else {
+       setResults({ nrr: null, teamRunRate: null, opponentRunRate: null, error: null });
+    }
+  };
+
+  useEffect(() => {
+    calculateNRR();
+  }, [values]);
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    // Allow only numbers and one decimal point
+    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+      setValues(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
+  };
+
+  const resetCalculator = () => {
+    setValues({
+      runsScored: '',
+      oversFaced: '',
+      runsConceded: '',
+      oversBowled: ''
+    });
+    setResults({ nrr: null, teamRunRate: null, opponentRunRate: null, error: null });
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-800 flex items-center justify-center">
+      <div className="max-w-md w-full bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100">
+        
+        {/* Header */}
+        <div className="bg-emerald-600 p-6 text-white relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-4 opacity-10">
+            <Trophy size={120} />
+          </div>
+          <h1 className="text-2xl font-bold relative z-10">NRR Calculator</h1>
+          <p className="text-emerald-100 text-sm mt-1 relative z-10">Net Run Rate Estimator</p>
         </div>
 
-        <div id="status" class="mt-6 text-gray-300"></div>
-        <div id="result" class="mt-4"></div>
-    </div>
-
-    <script>
-        // Set the workerSrc for PDF.js. This is required.
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
-
-        const fileInput = document.getElementById('pdf-upload');
-        const statusDiv = document.getElementById('status');
-        const resultDiv = document.getElementById('result');
-
-        fileInput.addEventListener('change', handleFileSelect, false);
-
-        async function handleFileSelect(event) {
-            const file = event.target.files[0];
-            if (!file || file.type !== 'application/pdf') {
-                statusDiv.textContent = 'Error: Please select a valid PDF file.';
-                return;
-            }
-
-            // Clear previous results and status
-            statusDiv.innerHTML = '';
-            resultDiv.innerHTML = '';
-
-            try {
-                // STEP 1: Render PDF pages to images using PDF.js
-                const pageImages = await renderPdfToImages(file);
-
-                // STEP 2: Perform OCR and create a searchable PDF using Tesseract.js
-                const searchablePdfBlob = await runOcr(pageImages);
-
-                // STEP 3: Display the download link
-                displayDownloadLink(searchablePdfBlob);
-
-            } catch (error) {
-                console.error('An error occurred:', error);
-                statusDiv.textContent = `Error: ${error.message}`;
-            }
-        }
-
-        async function renderPdfToImages(file) {
-            const images = [];
-            const fileReader = new FileReader();
-
-            // Load the PDF document
-            statusDiv.textContent = 'Loading PDF...';
-            const pdf = await new Promise((resolve, reject) => {
-                fileReader.onload = async (event) => {
-                    const typedarray = new Uint8Array(event.target.result);
-                    try {
-                        const pdfDoc = await pdfjsLib.getDocument({ data: typedarray }).promise;
-                        resolve(pdfDoc);
-                    } catch (err) {
-                        reject(err);
-                    }
-                };
-                fileReader.readAsArrayBuffer(file);
-            });
+        <div className="p-6 space-y-6">
+          
+          {/* Section: Batting Performance */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-emerald-700 font-semibold border-b border-emerald-100 pb-2">
+              <Activity size={18} />
+              <h3>Team Batting (For)</h3>
+            </div>
             
-            // Loop through each page and render it on a canvas
-            for (let i = 1; i <= pdf.numPages; i++) {
-                statusDiv.textContent = `Rendering page ${i}/${pdf.numPages}...`;
-                const page = await pdf.getPage(i);
-                const scale = 2.0; // Higher scale gives better OCR results
-                const viewport = page.getView
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Runs Scored</label>
+                <input
+                  type="text"
+                  name="runsScored"
+                  value={values.runsScored}
+                  onChange={handleInputChange}
+                  placeholder="e.g. 180"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-lg font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all placeholder:font-normal placeholder:text-slate-300"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Overs Faced</label>
+                <input
+                  type="text"
+                  name="oversFaced"
+                  value={values.oversFaced}
+                  onChange={handleInputChange}
+                  placeholder="e.g. 20.0"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-lg font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all placeholder:font-normal placeholder:text-slate-300"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Section: Bowling Performance */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-red-700 font-semibold border-b border-red-100 pb-2">
+              <Activity size={18} />
+              <h3>Team Bowling (Against)</h3>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Runs Conceded</label>
+                <input
+                  type="text"
+                  name="runsConceded"
+                  value={values.runsConceded}
+                  onChange={handleInputChange}
+                  placeholder="e.g. 165"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-lg font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-red-500 transition-all placeholder:font-normal placeholder:text-slate-300"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Overs Bowled</label>
+                <input
+                  type="text"
+                  name="oversBowled"
+                  value={values.oversBowled}
+                  onChange={handleInputChange}
+                  placeholder="e.g. 20.0"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-lg font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-red-500 transition-all placeholder:font-normal placeholder:text-slate-300"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Results Display */}
+          <div className={`rounded-2xl p-6 transition-all duration-300 ${results.nrr !== null ? (parseFloat(results.nrr) >= 0 ? 'bg-emerald-50 border border-emerald-100' : 'bg-red-50 border border-red-100') : 'bg-slate-100 border border-slate-200'}`}>
+            <div className="flex justify-between items-start mb-2">
+              <span className="text-sm font-medium text-slate-500 uppercase tracking-wider">Net Run Rate</span>
+              {results.nrr !== null && (
+                parseFloat(results.nrr) >= 0 
+                  ? <ArrowUp className="text-emerald-600" size={20} />
+                  : <ArrowDown className="text-red-600" size={20} />
+              )}
+            </div>
+            
+            <div className="flex items-baseline gap-2">
+              <span className={`text-5xl font-black tracking-tight ${results.nrr !== null ? (parseFloat(results.nrr) >= 0 ? 'text-emerald-600' : 'text-red-600') : 'text-slate-300'}`}>
+                {results.nrr !== null ? (parseFloat(results.nrr) > 0 ? `+${results.nrr}` : results.nrr) : '---'}
+              </span>
+            </div>
+
+            {/* Breakdown */}
+            {results.nrr !== null && (
+              <div className="mt-4 pt-4 border-t border-slate-200/50 flex justify-between text-xs text-slate-500">
+                <div>
+                  <span className="block mb-0.5">Scoring Rate</span>
+                  <span className="font-bold text-slate-700 text-sm">{results.teamRunRate}</span>
+                </div>
+                <div>
+                  <span className="block mb-0.5">Conceding Rate</span>
+                  <span className="font-bold text-slate-700 text-sm">{results.opponentRunRate}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Reset Button */}
+          <button 
+            onClick={resetCalculator}
+            className="w-full py-3 rounded-xl font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors flex items-center justify-center gap-2"
+          >
+            <RefreshCcw size={16} />
+            Reset
+          </button>
+        
+        </div>
+
+        {/* Info Footer */}
+        <div className="bg-slate-50 p-4 border-t border-slate-100 text-xs text-slate-400 flex items-start gap-2 leading-relaxed">
+          <Info size={14} className="mt-0.5 shrink-0" />
+          <p>
+            Note: For "All Out" scenarios, enter the full quota of overs (e.g., 20 or 50) instead of the overs actually faced, as per ICC rules.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default NRRCalculator;
