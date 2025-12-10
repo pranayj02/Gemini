@@ -63,7 +63,8 @@ function csvToQuestions(records) {
 
 // --- DOM ELEMENTS -----------------------------------------------------------
 
-const csvInput = document.getElementById("csv-input");
+const csvTextarea = document.getElementById("csv-textarea");
+const loadCsvBtn = document.getElementById("load-csv-btn");
 const questionBankStatusEl = document.getElementById("question-bank-status");
 const footerStatusEl = document.getElementById("footer-status");
 
@@ -132,38 +133,43 @@ tabButtons.forEach(btn => {
   });
 });
 
-// --- CSV UPLOAD -------------------------------------------------------------
+// --- CSV PASTE LOAD ---------------------------------------------------------
 
-csvInput.addEventListener("change", (e) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = event => {
-    try {
-      const text = event.target.result;
-      const parsed = parseCSV(text);
-      const questions = csvToQuestions(parsed);
-      if (!questions.length) {
-        questionBankStatusEl.textContent = "Could not find valid questions in CSV.";
-        footerStatusEl.textContent = "CSV loaded but no valid questions parsed.";
-        return;
-      }
-      state.questions = shuffleArray(questions);
-      state.currentIndex = -1;
-      questionBankStatusEl.textContent = `Loaded ${state.questions.length} questions (shuffled).`;
-      footerStatusEl.textContent = "Question bank loaded.";
-      questionTextEl.textContent = "Question bank loaded. Click Start quiz when ready.";
-      roundStatusEl.textContent = "";
-      questionCounterEl.textContent = "Ready.";
-      clearOptionsUI();
-    } catch (err) {
-      questionBankStatusEl.textContent = "Error reading CSV.";
-      footerStatusEl.textContent = "Error parsing CSV.";
-      console.error(err);
+loadCsvBtn.addEventListener("click", () => {
+  const text = (csvTextarea.value || "").trim();
+  if (!text) {
+    alert("Please paste CSV text first.");
+    return;
+  }
+
+  try {
+    const parsed = parseCSV(text);
+    const questions = csvToQuestions(parsed);
+
+    if (!questions.length) {
+      questionBankStatusEl.textContent = "Could not find valid questions in pasted CSV.";
+      footerStatusEl.textContent = "CSV pasted but no valid questions parsed.";
+      return;
     }
-  };
-  reader.readAsText(file);
+
+    state.questions = shuffleArray(questions);
+    state.currentIndex = -1;
+
+    questionBankStatusEl.textContent =
+      `Loaded ${state.questions.length} questions (shuffled).`;
+    footerStatusEl.textContent = "Question bank loaded from pasted CSV.";
+
+    questionTextEl.textContent = "Question bank loaded. Click Start quiz when ready.";
+    roundStatusEl.textContent = "";
+    questionCounterEl.textContent = "Ready.";
+    clearOptionsUI();
+  } catch (err) {
+    questionBankStatusEl.textContent = "Error reading pasted CSV.";
+    footerStatusEl.textContent = "Error parsing pasted CSV.";
+    console.error(err);
+  }
 });
+
 
 // --- QUIZ CONTROL -----------------------------------------------------------
 
