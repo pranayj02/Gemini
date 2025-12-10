@@ -1,224 +1,137 @@
-import React, { useState, useEffect } from 'react';
-import { RefreshCcw, Info, Trophy, Activity, ArrowUp, ArrowDown } from 'lucide-react';
-
-const NRRCalculator = () => {
-  const [values, setValues] = useState({
-    runsScored: '',
-    oversFaced: '',
-    runsConceded: '',
-    oversBowled: ''
-  });
-
-  const [results, setResults] = useState({
-    nrr: null,
-    teamRunRate: null,
-    opponentRunRate: null,
-    error: null
-  });
-
-  // Helper to convert cricket overs (e.g., 10.4) to mathematical overs (e.g., 10.666)
-  const parseOversToDecimal = (oversStr) => {
-    if (!oversStr) return 0;
-    const val = parseFloat(oversStr);
-    if (isNaN(val)) return 0;
-
-    const overs = Math.floor(val);
-    // Get the decimal part and multiply by 10 to get balls. 
-    // e.g. 10.4 -> 0.4 -> 4 balls. 
-    // Math.round to handle floating point precision issues
-    let balls = Math.round((val - overs) * 10);
-    
-    // Safety check for weird inputs like 10.9 (cricket max is .5)
-    // If balls >= 6, we just treat it as balls, effectively increasing overs
-    return overs + (balls / 6);
-  };
-
-  const calculateNRR = () => {
-    const scored = parseFloat(values.runsScored);
-    const conceded = parseFloat(values.runsConceded);
-    const facedDecimal = parseOversToDecimal(values.oversFaced);
-    const bowledDecimal = parseOversToDecimal(values.oversBowled);
-
-    if (parseOversToDecimal(values.oversFaced) === 0 || parseOversToDecimal(values.oversBowled) === 0) {
-      setResults({ nrr: null, teamRunRate: null, opponentRunRate: null, error: null });
-      return;
-    }
-
-    if (!isNaN(scored) && !isNaN(conceded) && facedDecimal > 0 && bowledDecimal > 0) {
-      const teamRR = scored / facedDecimal;
-      const oppRR = conceded / bowledDecimal;
-      const netRR = teamRR - oppRR;
-
-      setResults({
-        nrr: netRR.toFixed(3),
-        teamRunRate: teamRR.toFixed(2),
-        opponentRunRate: oppRR.toFixed(2),
-        error: null
-      });
-    } else {
-       setResults({ nrr: null, teamRunRate: null, opponentRunRate: null, error: null });
-    }
-  };
-
-  useEffect(() => {
-    calculateNRR();
-  }, [values]);
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    // Allow only numbers and one decimal point
-    if (value === '' || /^\d*\.?\d*$/.test(value)) {
-      setValues(prev => ({
-        ...prev,
-        [name]: value
-      }));
-    }
-  };
-
-  const resetCalculator = () => {
-    setValues({
-      runsScored: '',
-      oversFaced: '',
-      runsConceded: '',
-      oversBowled: ''
-    });
-    setResults({ nrr: null, teamRunRate: null, opponentRunRate: null, error: null });
-  };
-
-  return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-800 flex items-center justify-center">
-      <div className="max-w-md w-full bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100">
-        
-        {/* Header */}
-        <div className="bg-emerald-600 p-6 text-white relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-10">
-            <Trophy size={120} />
-          </div>
-          <h1 className="text-2xl font-bold relative z-10">NRR Calculator</h1>
-          <p className="text-emerald-100 text-sm mt-1 relative z-10">Net Run Rate Estimator</p>
-        </div>
-
-        <div className="p-6 space-y-6">
-          
-          {/* Section: Batting Performance */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-emerald-700 font-semibold border-b border-emerald-100 pb-2">
-              <Activity size={18} />
-              <h3>Team Batting (For)</h3>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Runs Scored</label>
-                <input
-                  type="text"
-                  name="runsScored"
-                  value={values.runsScored}
-                  onChange={handleInputChange}
-                  placeholder="e.g. 180"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-lg font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all placeholder:font-normal placeholder:text-slate-300"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Overs Faced</label>
-                <input
-                  type="text"
-                  name="oversFaced"
-                  value={values.oversFaced}
-                  onChange={handleInputChange}
-                  placeholder="e.g. 20.0"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-lg font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all placeholder:font-normal placeholder:text-slate-300"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Section: Bowling Performance */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-red-700 font-semibold border-b border-red-100 pb-2">
-              <Activity size={18} />
-              <h3>Team Bowling (Against)</h3>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Runs Conceded</label>
-                <input
-                  type="text"
-                  name="runsConceded"
-                  value={values.runsConceded}
-                  onChange={handleInputChange}
-                  placeholder="e.g. 165"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-lg font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-red-500 transition-all placeholder:font-normal placeholder:text-slate-300"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Overs Bowled</label>
-                <input
-                  type="text"
-                  name="oversBowled"
-                  value={values.oversBowled}
-                  onChange={handleInputChange}
-                  placeholder="e.g. 20.0"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-lg font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-red-500 transition-all placeholder:font-normal placeholder:text-slate-300"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Results Display */}
-          <div className={`rounded-2xl p-6 transition-all duration-300 ${results.nrr !== null ? (parseFloat(results.nrr) >= 0 ? 'bg-emerald-50 border border-emerald-100' : 'bg-red-50 border border-red-100') : 'bg-slate-100 border border-slate-200'}`}>
-            <div className="flex justify-between items-start mb-2">
-              <span className="text-sm font-medium text-slate-500 uppercase tracking-wider">Net Run Rate</span>
-              {results.nrr !== null && (
-                parseFloat(results.nrr) >= 0 
-                  ? <ArrowUp className="text-emerald-600" size={20} />
-                  : <ArrowDown className="text-red-600" size={20} />
-              )}
-            </div>
-            
-            <div className="flex items-baseline gap-2">
-              <span className={`text-5xl font-black tracking-tight ${results.nrr !== null ? (parseFloat(results.nrr) >= 0 ? 'text-emerald-600' : 'text-red-600') : 'text-slate-300'}`}>
-                {results.nrr !== null ? (parseFloat(results.nrr) > 0 ? `+${results.nrr}` : results.nrr) : '---'}
-              </span>
-            </div>
-
-            {/* Breakdown */}
-            {results.nrr !== null && (
-              <div className="mt-4 pt-4 border-t border-slate-200/50 flex justify-between text-xs text-slate-500">
-                <div>
-                  <span className="block mb-0.5">Scoring Rate</span>
-                  <span className="font-bold text-slate-700 text-sm">{results.teamRunRate}</span>
-                </div>
-                <div>
-                  <span className="block mb-0.5">Conceding Rate</span>
-                  <span className="font-bold text-slate-700 text-sm">{results.opponentRunRate}</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Reset Button */}
-          <button 
-            onClick={resetCalculator}
-            className="w-full py-3 rounded-xl font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors flex items-center justify-center gap-2"
-          >
-            <RefreshCcw size={16} />
-            Reset
-          </button>
-        
-        </div>
-
-        {/* Info Footer */}
-        <div className="bg-slate-50 p-4 border-t border-slate-100 text-xs text-slate-400 flex items-start gap-2 leading-relaxed">
-          <Info size={14} className="mt-0.5 shrink-0" />
-          <p>
-            Note: For "All Out" scenarios, enter the full quota of overs (e.g., 20 or 50) instead of the overs actually faced, as per ICC rules.
-          </p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Quizmaster Pro</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-mark">Q</div>
+        <div>
+          <h1>Quizmaster Pro</h1>
+          <p>Host your team quiz with style</p>
         </div>
       </div>
-    </div>
-  );
-};
+      <div class="header-right">
+        <label class="file-upload">
+          <input type="file" id="csv-input" accept=".csv" />
+          <span>Upload Question CSV</span>
+        </label>
+        <button id="reset-btn" class="ghost-btn">Reset</button>
+      </div>
+    </header>
 
-export default NRRCalculator;
+    <main class="app-main">
+      <aside class="sidebar">
+        <section class="card">
+          <h2>Teams</h2>
+          <p class="hint">Edit names, then tap “Start Quiz”.</p>
+          <div id="teams-editor"></div>
+          <button id="add-team-btn" class="secondary-btn full-width">+ Add team</button>
+          <button id="start-quiz-btn" class="primary-btn full-width">Start quiz</button>
+        </section>
+
+        <section class="card compact">
+          <h3>Question bank</h3>
+          <p id="question-bank-status" class="hint">No CSV loaded.</p>
+        </section>
+      </aside>
+
+      <section class="content">
+        <nav class="tabs">
+          <button class="tab-btn active" data-tab="quiz-tab">Quiz control</button>
+          <button class="tab-btn" data-tab="standings-tab">Live standings</button>
+        </nav>
+
+        <section id="quiz-tab" class="tab active">
+          <div class="layout-two">
+            <div class="card main-card">
+              <div class="card-header">
+                <div>
+                  <h2 id="question-counter">Waiting to start…</h2>
+                  <p id="round-status" class="hint"></p>
+                </div>
+                <div class="controls-row">
+                  <button id="read-question-btn" class="icon-btn" title="Read aloud">🔊</button>
+                  <button id="next-question-btn" class="primary-btn">Next question</button>
+                </div>
+              </div>
+
+              <div id="question-body">
+                <h3 id="question-text" class="question-text">
+                  Upload a CSV and start the quiz to begin.
+                </h3>
+                <div id="options" class="options-grid">
+                  <!-- 4 option buttons injected by JS -->
+                </div>
+              </div>
+            </div>
+
+            <div class="card side-card">
+              <h3>Answer control</h3>
+              <ol class="steps">
+                <li>Select an option.</li>
+                <li>Select the team that answered.</li>
+              </ol>
+
+              <div class="label-row">
+                <span>Current selection</span>
+                <span id="current-selection" class="pill">None</span>
+              </div>
+
+              <div class="subsection">
+                <h4>Options</h4>
+                <p class="hint">Your chosen answer for this question.</p>
+                <div id="option-summary" class="summary-box">None selected.</div>
+              </div>
+
+              <div class="subsection">
+                <h4>Teams</h4>
+                <p class="hint">Who buzzed in and answered?</p>
+                <div id="team-buttons" class="team-buttons"></div>
+              </div>
+
+              <div id="feedback" class="feedback"></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="standings-tab" class="tab">
+          <div class="card">
+            <div class="card-header">
+              <h2>Live standings</h2>
+              <p class="hint">Auto-updates as you score questions.</p>
+            </div>
+            <div class="table-wrapper">
+              <table id="standings-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Team</th>
+                    <th>Score</th>
+                    <th>Answered</th>
+                    <th>Correct</th>
+                  </tr>
+                </thead>
+                <tbody id="standings-body">
+                  <!-- Filled by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <span id="footer-status">Ready.</span>
+    </footer>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
