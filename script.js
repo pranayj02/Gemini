@@ -1,30 +1,6 @@
-// --- CSV PARSING & QUESTION MODEL -------------------------------------------
+// --- CSV HELPERS & CORE STATE ----------------------------------------------
 
-let state = {
-  questions: [],
-  currentIndex: -1,
-  teams: [],
-  scores: {},            // teamId -> number
-  answeredCount: {},     // teamId -> number
-  correctCount: {},      // teamId -> number
-  selectedOptionIndex: null,
-  selectedTeamId: null,
-  quizStarted: false
-};
-
-const DEFAULT_POINTS = 10;
-
-// Utility: Fisher–Yates shuffle [web:62][web:65]
-function shuffleArray(arr) {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-// Very light CSV parser assuming no commas inside fields. [web:60][web:67]
+// Light CSV parser (no quoted commas, simple spreadsheet export). [web:86][web:136]
 function parseCSV(text) {
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   if (!lines.length) return [];
@@ -40,58 +16,56 @@ function parseCSV(text) {
   });
 }
 
+// Convert CSV records into internal question objects
 function csvToQuestions(records) {
-  // Expected headers: question, option1..4, correctIndex (1-4), points
-  return records.map(r => {
-    const correctIndex = Math.max(
-      0,
-      Math.min(3, (parseInt(r.correctIndex, 10) || 1) - 1)
+  return records
+    .map(r => {
+      const correctIndex = Math.max(
+        0,
+        Math.min(3, (parseInt(r.correctIndex, 10) || 1) - 1)
+      );
+      const points = parseInt(r.points, 10) || DEFAULT_POINTS;
+      return {
+        text: r.question || "",
+        options: [r.option1, r.option2, r.option3, r.option4].map(o => o || ""),
+        correctIndex,
+        points
+      };
+    })
+    .filter(
+      q =>
+        q.text &&
+        q.options.length === 4 &&
+        q.options.every(o => o !== "")
     );
-    const points = parseInt(r.points, 10) || DEFAULT_POINTS;
-    return {
-      text: r.question || "",
-      options: [r.option1, r.option2, r.option3, r.option4].map(o => o || ""),
-      correctIndex,
-      points
-    };
-  }).filter(q =>
-    q.text &&
-    q.options.length === 4 &&
-    q.options.every(o => o !== "")
-  );
 }
 
-async function loadQuestionsFromRepo() {
-  try {
-    const response = await fetch("questions.csv"); // path in your repo
-    if (!response.ok) {
-      console.error("Failed to load questions.csv", response.status);
-      return;
-    }
-    const text = await response.text(); // CSV as text [web:122][web:121]
-    const parsed = parseCSV(text);
-    const questions = csvToQuestions(parsed);
-    if (!questions.length) {
-      console.error("No valid questions parsed from CSV.");
-      return;
-    }
-    state.questions = shuffleArray(questions);
-    state.currentIndex = -1;
-    questionBankStatusEl.textContent = `Loaded ${state.questions.length} questions (shuffled) from repo CSV.`;
-    questionTextEl.textContent = "Question bank ready. Click Start quiz when ready.";
-    questionCounterEl.textContent = "Ready.";
-    roundStatusEl.textContent = "";
-    clearOptionsUI();
-  } catch (err) {
-    console.error("Error loading CSV from repo:", err);
+// Fisher–Yates shuffle (copying the array). [web:65][web:68][web:142][web:147]
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
   }
+  return a;
 }
 
+const DEFAULT_POINTS = 10;
+
+let state = {
+  questions: [],
+  currentIndex: -1,
+  teams: [],
+  scores: {}, // teamId -> number
+  answeredCount: {}, // teamId -> number
+  correctCount: {}, // teamId -> number
+  selectedOptionIndex: null,
+  selectedTeamId: null,
+  quizStarted: false
+};
 
 // --- DOM ELEMENTS -----------------------------------------------------------
 
-const csvTextarea = document.getElementById("csv-textarea");
-const loadCsvBtn = document.getElementById("load-csv-btn");
 const questionBankStatusEl = document.getElementById("question-bank-status");
 const footerStatusEl = document.getElementById("footer-status");
 
@@ -118,7 +92,7 @@ const feedbackEl = document.getElementById("feedback");
 
 const standingsBody = document.getElementById("standings-body");
 
-// --- INITIAL UI SETUP -------------------------------------------------------
+// --- INITIAL TEAM UI --------------------------------------------------------
 
 function initTeams() {
   const defaultNames = ["Team A", "Team B", "Team C"];
@@ -128,6 +102,7 @@ function initTeams() {
 function addTeamRow(name = "") {
   const row = document.createElement("div");
   row.className = "team-row";
+
   const input = document.createElement("input");
   input.type = "text";
   input.placeholder = "Team name";
@@ -160,43 +135,41 @@ tabButtons.forEach(btn => {
   });
 });
 
-// --- CSV PASTE LOAD ---------------------------------------------------------
+// --- LOAD QUESTIONS FROM REPO CSV ------------------------------------------
 
-loadCsvBtn.addEventListener("click", () => {
-  const text = (csvTextarea.value || "").trim();
-  if (!text) {
-    alert("Please paste CSV text first.");
-    return;
-  }
-
+// Automatically read questions.csv using fetch on GitHub Pages. [web:86][web:122][web:127]
+async function loadQuestionsFromRepo() {
   try {
+    const response = await fetch("questions.csv");
+    if (!response.ok) {
+      console.error("Failed to load questions.csv", response.status);
+      questionBankStatusEl.textContent = "Could not load questions.csv from repo.";
+      return;
+    }
+
+    const text = await response.text();
     const parsed = parseCSV(text);
     const questions = csvToQuestions(parsed);
 
     if (!questions.length) {
-      questionBankStatusEl.textContent = "Could not find valid questions in pasted CSV.";
-      footerStatusEl.textContent = "CSV pasted but no valid questions parsed.";
+      console.error("No valid questions parsed from CSV.");
+      questionBankStatusEl.textContent = "No valid questions in questions.csv.";
       return;
     }
 
     state.questions = shuffleArray(questions);
     state.currentIndex = -1;
 
-    questionBankStatusEl.textContent =
-      `Loaded ${state.questions.length} questions (shuffled).`;
-    footerStatusEl.textContent = "Question bank loaded from pasted CSV.";
-
-    questionTextEl.textContent = "Question bank loaded. Click Start quiz when ready.";
-    roundStatusEl.textContent = "";
+    questionBankStatusEl.textContent = `Loaded ${state.questions.length} questions (shuffled) from repo CSV.`;
+    questionTextEl.textContent = "Question bank ready. Click Start quiz when ready.";
     questionCounterEl.textContent = "Ready.";
+    roundStatusEl.textContent = "";
     clearOptionsUI();
   } catch (err) {
-    questionBankStatusEl.textContent = "Error reading pasted CSV.";
-    footerStatusEl.textContent = "Error parsing pasted CSV.";
-    console.error(err);
+    console.error("Error loading CSV from repo:", err);
+    questionBankStatusEl.textContent = "Error loading questions.csv.";
   }
-});
-
+}
 
 // --- QUIZ CONTROL -----------------------------------------------------------
 
@@ -210,7 +183,7 @@ startQuizBtn.addEventListener("click", () => {
     return;
   }
   if (!state.questions.length) {
-    alert("Please upload a question CSV first.");
+    alert("No questions loaded from questions.csv.");
     return;
   }
 
@@ -242,9 +215,10 @@ resetBtn.addEventListener("click", () => {
   state.selectedOptionIndex = null;
   state.selectedTeamId = null;
   state.quizStarted = false;
-  questionTextEl.textContent = "Upload a CSV and start the quiz to begin.";
+
+  questionTextEl.textContent = "Question bank ready. Click Start quiz when ready.";
   roundStatusEl.textContent = "";
-  questionCounterEl.textContent = "Waiting to start…";
+  questionCounterEl.textContent = "Ready.";
   clearOptionsUI();
   feedbackEl.textContent = "";
   currentSelectionEl.textContent = "None";
@@ -265,17 +239,21 @@ readQuestionBtn.addEventListener("click", () => {
 
 function goToNextQuestion() {
   if (!state.quizStarted || !state.questions.length) return;
+
   const nextIndex = state.currentIndex + 1;
   if (nextIndex >= state.questions.length) {
     endQuiz();
     return;
   }
+
   state.currentIndex = nextIndex;
   state.selectedOptionIndex = null;
   state.selectedTeamId = null;
+
   feedbackEl.textContent = "";
   currentSelectionEl.textContent = "None";
   optionSummaryEl.textContent = "None selected.";
+
   renderQuestion();
 }
 
@@ -294,6 +272,7 @@ function clearOptionsUI() {
 function renderOptions(q) {
   optionsContainer.innerHTML = "";
   const labels = ["A", "B", "C", "D"];
+
   q.options.forEach((opt, i) => {
     const btn = document.createElement("button");
     btn.type = "button";
@@ -342,12 +321,14 @@ function buildTeamButtons() {
     btn.className = "team-btn";
     btn.dataset.teamId = team.id;
     btn.textContent = team.name;
+
     btn.addEventListener("click", () => {
       state.selectedTeamId = team.id;
       updateTeamSelectionUI();
       updateCurrentSelectionLabel();
       maybeScore();
     });
+
     teamButtonsContainer.appendChild(btn);
   });
 }
@@ -361,8 +342,8 @@ function updateTeamSelectionUI() {
 
 function updateCurrentSelectionLabel() {
   let label = "";
-  const q = state.questions[state.currentIndex];
   const labels = ["A", "B", "C", "D"];
+
   if (state.selectedOptionIndex != null) {
     label += `Option ${labels[state.selectedOptionIndex]}`;
   }
@@ -379,12 +360,14 @@ function maybeScore() {
   if (state.selectedOptionIndex == null || !state.selectedTeamId) {
     return;
   }
+
   const q = state.questions[state.currentIndex];
   const isCorrect = state.selectedOptionIndex === q.correctIndex;
   const team = state.teams.find(t => t.id === state.selectedTeamId);
   const teamId = team.id;
 
   state.answeredCount[teamId] = (state.answeredCount[teamId] || 0) + 1;
+
   const optionButtons = optionsContainer.querySelectorAll(".option-btn");
 
   if (isCorrect) {
@@ -418,16 +401,18 @@ function maybeScore() {
 // --- STANDINGS TABLE --------------------------------------------------------
 
 function renderStandings() {
-  const rows = state.teams.map(t => {
-    const id = t.id;
-    return {
-      id,
-      name: t.name,
-      score: state.scores[id] || 0,
-      answered: state.answeredCount[id] || 0,
-      correct: state.correctCount[id] || 0
-    };
-  }).sort((a, b) => b.score - a.score);
+  const rows = state.teams
+    .map(t => {
+      const id = t.id;
+      return {
+        id,
+        name: t.name,
+        score: state.scores[id] || 0,
+        answered: state.answeredCount[id] || 0,
+        correct: state.correctCount[id] || 0
+      };
+    })
+    .sort((a, b) => b.score - a.score);
 
   standingsBody.innerHTML = "";
   rows.forEach((row, index) => {
@@ -456,7 +441,7 @@ function endQuiz() {
 }
 
 // --- TTS (Web Speech API) ---------------------------------------------------
-// [web:36][web:55]
+// Uses native browser speechSynthesis. [web:140][web:148][web:25][web:143]
 
 function readCurrentQuestion() {
   if (state.currentIndex < 0 || !state.questions.length) return;
@@ -488,4 +473,3 @@ footerStatusEl.textContent = "Loading questions from repo CSV...";
 loadQuestionsFromRepo().then(() => {
   footerStatusEl.textContent = "Ready. Configure teams and start quiz.";
 });
-
