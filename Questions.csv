@@ -1,0 +1,31 @@
+question,option1,option2,option3,option4,correctIndex,points
+"Which company is considered the first major FinTech success story, co-founded by Elon Musk?",Stripe,PayPal,Square,Visa,2,1
+What does the acronym 'ATM' stand for?,Any Time Money,Automated Transaction Machine,Automated Teller Machine,All Time Money,3,1
+"In Digital Marketing, what is a 'CTA'?",Cost To Acquire,Click To Access,Call To Action,Customer Traffic Area,3,1
+Which color is traditionally associated with a 'Bull Market'?,Red,Green,Blue,Black,2,1
+What is the 3 or 4-digit security code on the back of a credit card called?,PIN,OTP,CVV,IFSC,3,1
+Which technology giant launched 'Apple Pay' in 2014?,Google,Samsung,Apple,Microsoft,3,1
+What does 'PCI DSS' stand for in the context of payment security?,Payment Card Industry Data Security Standard,Public Credit Institute Data Safety System,Private Card Interface Digital Secure Socket,Payment Control Industry Digital Standard,1,1
+Which credit card network uses the slogan 'Everywhere you want to be'?,Mastercard,Amex,Visa,Discover,3,1
+"In API architecture, which HTTP method is typically used to update an existing resource?",GET,POST,PUT,DELETE,3,1
+What do you call a privately held startup valued at over $1 billion?,A Decacorn,A Dragon,A Unicorn,A Zebra,3,1
+Who is the pseudonymous creator of Bitcoin?,Vitalik Buterin,Satoshi Nakamoto,Elon Musk,Charlie Lee,2,1
+What does UPI stand for in the context of Indian payments?,Universal Payment Interface,Unified Payments Interface,Union Payment Integration,United Payment Interconnect,2,1
+Which organization created and manages UPI in India?,RBI,SEBI,NPCI,NITI Aayog,3,1
+What is the digital ledger that records crypto transactions across many computers?,Cloud Database,Blockchain,Dark Web,Mesh Network,2,1
+"In FinTech, what does 'BNPL' stand for?","Bank Now, Pay Later","Buy Now, Pay Later","Borrow Now, Pay Less","Buy New, Pay Later",2,1
+Which Indian FinTech is known for its 'Soundbox' speaker?,PhonePe,BharatPe,Paytm,Google Pay,3,1
+What is the process of replacing sensitive card data with a unique non-sensitive ID called?,Encryption,Hashing,Tokenization,Salting,3,1
+Neobanks are banks that operate without what physical feature?,Mobile App,Customer Support,Physical branches,License,3,1
+What does 'NFC' allow you to do with a credit card?,Swipe to Pay,Chip Insert,Tap to Pay,Online Transfer,3,1
+Which Indian QR standard allows merchants to accept any UPI app?,BHIM,BharatQR,IndiaQR,C-DAC,2,1
+"In business, what does 'Churn Rate' measure?",Rate of new hiring,Speed of website loading,Percentage of customers who stop using a service,Growth of revenue year-over-year,3,1
+What cyberattack locks your data and demands payment to release it?,Phishing,Spyware,Ransomware,DDoS,3,1
+"In Business Development metrics, what does 'CAC' stand for?",Customer Average Cycle,Company Annual Cashflow,Customer Acquisition Cost,Cost Adjusted Capital,3,1
+The 'Big Mac Index' measures what economic concept?,Inflation Rate,GDP Growth,Purchasing Power Parity,Stock Market Volatility,3,1
+What is the primary focus of the ISO 27001 standard?,Quality Management,Information Security Management Systems (ISMS),Environmental Safety,Cloud Computing Privacy,2,1
+"What is an ""MVP"" in product management strategy",Most Valuable Player ,Minimum Viable Product ,Maximum Volume Production,Manager Vice President,2,1
+"In 'Shark Tank India', who is the founder of boAt Lifestyle?",Ashneer Grover,Peyush Bansal,Aman Gupta,Anupam Mittal,3,1
+What is the sales technique of persuading a customer to buy a more expensive version of a product?,Cold Calling,Upselling,Forecasting,Whitelisting,2,1
+Which specific Google product is responsible for the vast majority (~70-80%) of Alphabet's total revenue?,Google Cloud Platform,Android OS Licensing,Google Search & Ads,YouTube Premium Subscriptions,3,1
+Which country first adopted Bitcoin as legal tender in 2021?,Venezuela,El Salvador,Japan,Switzerland,2,1
