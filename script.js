@@ -89,7 +89,7 @@ const teamButtonsContainer = document.getElementById("team-buttons");
 const currentSelectionEl = document.getElementById("current-selection");
 const optionSummaryEl = document.getElementById("option-summary");
 const feedbackEl = document.getElementById("feedback");
-
+const submitAnswerBtn = document.getElementById("submit-answer-btn");
 const standingsBody = document.getElementById("standings-body");
 
 // --- INITIAL TEAM UI --------------------------------------------------------
@@ -241,10 +241,32 @@ function goToNextQuestion() {
   if (!state.quizStarted || !state.questions.length) return;
 
   const nextIndex = state.currentIndex + 1;
+  
+  // Check if we reached the end
   if (nextIndex >= state.questions.length) {
     endQuiz();
     return;
   }
+
+  // Update indices and reset state
+  state.currentIndex = nextIndex;
+  state.selectedOptionIndex = null;
+  state.selectedTeamId = null;
+
+  // Clear text feedback
+  feedbackEl.textContent = "";
+  currentSelectionEl.textContent = "None";
+  optionSummaryEl.textContent = "None selected.";
+
+  // --- NEW: Reset the submit button to disabled ---
+  submitAnswerBtn.disabled = true;
+
+  // --- NEW: Visually clear the previous team selection ---
+  updateTeamSelectionUI();
+
+  // Render the new question options
+  renderQuestion();
+}
 
   state.currentIndex = nextIndex;
   state.selectedOptionIndex = null;
@@ -290,12 +312,16 @@ function renderOptions(q) {
     btn.appendChild(labelSpan);
     btn.appendChild(textSpan);
 
-    btn.addEventListener("click", () => {
+   btn.addEventListener("click", () => {
       if (!state.quizStarted) return;
       state.selectedOptionIndex = i;
       updateOptionSelectionUI();
       updateCurrentSelectionLabel();
       optionSummaryEl.textContent = `${labels[i]}. ${opt}`;
+      
+      // OLD CODE: maybeScore(); 
+      // NEW CODE: Check if we can enable the submit button
+      checkSubmitButtonState(); 
     });
 
     optionsContainer.appendChild(btn);
@@ -322,12 +348,17 @@ function buildTeamButtons() {
     btn.dataset.teamId = team.id;
     btn.textContent = team.name;
 
+    // Inside buildTeamButtons() ...
     btn.addEventListener("click", () => {
       state.selectedTeamId = team.id;
       updateTeamSelectionUI();
       updateCurrentSelectionLabel();
-      maybeScore();
+      
+      // OLD CODE: maybeScore();
+      // NEW CODE: Check if we can enable the submit button
+      checkSubmitButtonState();
     });
+// ... rest of function
 
     teamButtonsContainer.appendChild(btn);
   });
@@ -473,3 +504,66 @@ footerStatusEl.textContent = "Loading questions from repo CSV...";
 loadQuestionsFromRepo().then(() => {
   footerStatusEl.textContent = "Ready. Configure teams and start quiz.";
 });
+
+// --- NEW SUBMIT LOGIC -------------------------------------
+
+function checkSubmitButtonState() {
+  // Only enable button if both an Option AND a Team are selected
+  if (state.selectedOptionIndex !== null && state.selectedTeamId) {
+    submitAnswerBtn.disabled = false;
+    submitAnswerBtn.classList.remove("ghost-btn"); // Optional visual tweak
+  } else {
+    submitAnswerBtn.disabled = true;
+  }
+}
+
+// The click listener for the new button
+submitAnswerBtn.addEventListener("click", () => {
+  confirmScore();
+});
+
+// Renamed from maybeScore to confirmScore to reflect it's manual now
+function confirmScore() {
+  if (state.selectedOptionIndex == null || !state.selectedTeamId) return;
+
+  const q = state.questions[state.currentIndex];
+  const isCorrect = state.selectedOptionIndex === q.correctIndex;
+  const team = state.teams.find(t => t.id === state.selectedTeamId);
+  const teamId = team.id;
+
+  // 1. Record stats
+  state.answeredCount[teamId] = (state.answeredCount[teamId] || 0) + 1;
+
+  const optionButtons = optionsContainer.querySelectorAll(".option-btn");
+
+  // 2. Handle Correct/Wrong Logic
+  if (isCorrect) {
+    state.scores[teamId] += q.points || DEFAULT_POINTS;
+    state.correctCount[teamId] = (state.correctCount[teamId] || 0) + 1;
+    feedbackEl.textContent = `${team.name} is correct! +${q.points || DEFAULT_POINTS} points.`;
+    speakText(`${team.name} is correct!`);
+    
+    // Highlight correct button Green
+    optionButtons.forEach(btn => {
+      const i = Number(btn.dataset.index);
+      if (i === state.selectedOptionIndex) btn.classList.add("correct");
+    });
+  } else {
+    const correctText = q.options[q.correctIndex];
+    feedbackEl.textContent = `${team.name} is wrong. Correct answer: ${correctText}.`;
+    speakText(`${team.name} is wrong. The correct answer is ${correctText}.`);
+    
+    // Highlight wrong button Red, Correct button Green
+    optionButtons.forEach(btn => {
+      const i = Number(btn.dataset.index);
+      if (i === state.selectedOptionIndex) btn.classList.add("wrong");
+      if (i === q.correctIndex) btn.classList.add("correct");
+    });
+  }
+
+  // 3. Disable controls so they can't submit twice for the same question
+  optionButtons.forEach(btn => btn.disabled = true);
+  submitAnswerBtn.disabled = true; // Disable submit button after use
+
+  renderStandings();
+}
