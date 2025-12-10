@@ -37,8 +37,15 @@
 
         <section class="card compact">
           <h3>Question bank</h3>
+          <p class="hint">Paste CSV text below, then click “Load questions”.</p>
+          <textarea id="csv-textarea" rows="6" class="csv-textarea"
+        placeholder="question,option1,option2,option3,option4,correctIndex,points&#10;Which planet is known as the Red Planet?,Earth,Mars,Jupiter,Venus,2,10"></textarea>
+          <div style="display:flex;gap:8px;margin-top:8px;">
+            <button id="load-csv-btn" class="secondary-btn full-width">Load questions</button>
+          </div>
           <p id="question-bank-status" class="hint">No CSV loaded.</p>
         </section>
+
       </aside>
 
       <section class="content">
