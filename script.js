@@ -61,6 +61,33 @@ function csvToQuestions(records) {
   );
 }
 
+async function loadQuestionsFromRepo() {
+  try {
+    const response = await fetch("questions.csv"); // path in your repo
+    if (!response.ok) {
+      console.error("Failed to load questions.csv", response.status);
+      return;
+    }
+    const text = await response.text(); // CSV as text [web:122][web:121]
+    const parsed = parseCSV(text);
+    const questions = csvToQuestions(parsed);
+    if (!questions.length) {
+      console.error("No valid questions parsed from CSV.");
+      return;
+    }
+    state.questions = shuffleArray(questions);
+    state.currentIndex = -1;
+    questionBankStatusEl.textContent = `Loaded ${state.questions.length} questions (shuffled) from repo CSV.`;
+    questionTextEl.textContent = "Question bank ready. Click Start quiz when ready.";
+    questionCounterEl.textContent = "Ready.";
+    roundStatusEl.textContent = "";
+    clearOptionsUI();
+  } catch (err) {
+    console.error("Error loading CSV from repo:", err);
+  }
+}
+
+
 // --- DOM ELEMENTS -----------------------------------------------------------
 
 const csvTextarea = document.getElementById("csv-textarea");
@@ -457,4 +484,8 @@ function speakText(text) {
 // --- BOOTSTRAP --------------------------------------------------------------
 
 initTeams();
-footerStatusEl.textContent = "Ready. Upload CSV and configure teams.";
+footerStatusEl.textContent = "Loading questions from repo CSV...";
+loadQuestionsFromRepo().then(() => {
+  footerStatusEl.textContent = "Ready. Configure teams and start quiz.";
+});
+
